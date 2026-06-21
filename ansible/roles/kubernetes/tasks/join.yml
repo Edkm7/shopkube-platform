@@ -1,0 +1,31 @@
+# roles/kubernetes/tasks/join.yml
+- name: Check if node already joined (kubelet conf)
+  stat:
+    path: /etc/kubernetes/kubelet.conf
+  register: kubelet_conf
+
+- name: Fetch join script from master (via delegate_to)
+  fetch:
+    src: /tmp/kubeadm_join_cmd.sh
+    dest: /tmp/kubeadm_join_cmd_{{ inventory_hostname }}.sh
+    flat: yes
+  delegate_to: controlplane-c1
+  when: not kubelet_conf.stat.exists
+
+- name: Copy join script to worker
+  copy:
+    src: /tmp/kubeadm_join_cmd_{{ inventory_hostname }}.sh
+    dest: /tmp/kubeadm_join_cmd.sh
+    mode: '0755'
+  when: not kubelet_conf.stat.exists
+
+- name: Run kubeadm join on worker
+  command: /tmp/kubeadm_join_cmd.sh
+  args:
+  when: not kubelet_conf.stat.exists
+
+- name: Ensure kubelet enabled and started
+  systemd:
+    name: kubelet
+    state: started
+    enabled: yes

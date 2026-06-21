@@ -1,0 +1,16 @@
+# roles/kubernetes/vars/main.yml
+
+# Version Kubernetes
+k8s_major_minor: "1.33"
+k8s_version_full: "1.33.0-1.1"   # version exacte du paquet .deb
+
+k8s_repo_url: "https://pkgs.k8s.io/core:/stable:/v{{ k8s_major_minor }}/deb/"
+k8s_key_url: "https://pkgs.k8s.io/core:/stable:/v{{ k8s_major_minor }}/deb/Release.key"
+
+k8s_pod_network_cidr: "10.244.0.0/16"   # utilisé par Calico
+k8s_cni_manifest_url: "https://raw.githubusercontent.com/projectcalico/calico/v3.30.4/manifests/calico.yaml"
+
+k8s_packages:
+  - "kubelet={{ k8s_version_full }}"
+  - "kubeadm={{ k8s_version_full }}"
+  - "kubectl={{ k8s_version_full }}"

@@ -1,0 +1,10 @@
+# roles/kubernetes/tasks/prereqs.yml (déjà en partie fait par common, ceci ajoute checks)
+- name: Ensure iptables package present
+  apt:
+    name: iptables
+    state: present
+
+- name: Ensure socat is installed
+  apt:
+    name: socat
+    state: present

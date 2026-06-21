@@ -1,0 +1,18 @@
+# roles/kubernetes/tasks/main.yml
+- name: Include common prereqs
+  include_tasks: prereqs.yml
+
+- name: Install kube packages
+  include_tasks: kube_packages.yml
+
+- name: Install containerd
+  include_tasks: containerd.yml
+
+
+- name: If host is master, initialize cluster
+  include_tasks: master.yml
+  when: "'master' in group_names"
+
+- name: If host is worker, join cluster
+  include_tasks: join.yml
+  when: "'workers' in group_names"

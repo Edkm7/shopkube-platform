@@ -1,0 +1,70 @@
+# roles/common/tasks/main.yml
+---
+- name: Update apt cache and upgrade
+  apt:
+    update_cache: yes
+    upgrade: dist
+  tags: common
+
+- name: Install basic packages
+  apt:
+    name:
+      - apt-transport-https
+      - ca-certificates
+      - curl
+      - gnupg
+      - lsb-release
+      - software-properties-common
+    state: present
+  tags: common
+
+############################################
+# KERNEL MODULES
+############################################
+
+- name: Ensure br_netfilter module is loaded
+  ansible.builtin.modprobe:
+    name: br_netfilter
+    state: present
+  tags: common
+
+- name: Persist br_netfilter module
+  copy:
+    dest: /etc/modules-load.d/k8s.conf
+    content: |
+      br_netfilter
+    mode: "0644"
+  tags: common
+
+############################################
+# SYSCTL - KUBERNETES REQUIREMENTS
+############################################
+
+- name: Ensure Kubernetes sysctl prerequisites are set
+  sysctl:
+    name: "{{ item.name }}"
+    value: "{{ item.value }}"
+    state: present
+    reload: yes
+  loop:
+    - { name: net.bridge.bridge-nf-call-iptables, value: "1" }
+    - { name: net.bridge.bridge-nf-call-ip6tables, value: "1" }
+    - { name: net.ipv4.ip_forward, value: "1" }
+  tags: common
+
+############################################
+# SWAP (MANDATORY)
+############################################
+
+- name: Disable swap now
+  shell: swapoff -a
+  args:
+    executable: /bin/bash
+  tags: common
+
+- name: Disable swap in fstab
+  replace:
+    path: /etc/fstab
+    regexp: '(^.*\sswap\s.*$)'
+    replace: '# \1'
+  tags: common

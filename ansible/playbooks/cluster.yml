@@ -1,0 +1,13 @@
+# playbooks/cluster.yml
+
+- name: Apply common tasks to all nodes
+  hosts: all
+  become: yes
+  roles:
+    - common
+
+- name: Install kubernetes components and configure cluster
+  hosts: all
+  become: yes
+  roles:
+    - kubernetes

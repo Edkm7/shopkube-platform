@@ -1,0 +1,32 @@
+---
+# playbooks/reset.yml
+
+- name: Reset Kubernetes cluster
+  hosts: all
+  become: yes
+  tasks:
+    - name: Reset kubeadm
+      command: kubeadm reset -f
+      ignore_errors: yes
+
+    - name: Remove CNI interfaces
+      file:
+        path: /etc/cni/net.d
+        state: absent
+
+    - name: Remove kube configs
+      file:
+        path: "{{ item }}"
+        state: absent
+      loop:
+        - /etc/kubernetes/
+        - $HOME/.kube
+        - /var/lib/etcd
+        - /var/lib/kubelet
+        - /var/lib/dockershim
+        - /var/lib/cni/
+        - /etc/cni/net.d
+
+    - name: Clean iptables
+      command: iptables -F
+      ignore_errors: yes

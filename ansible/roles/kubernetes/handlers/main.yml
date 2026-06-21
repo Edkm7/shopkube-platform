@@ -1,0 +1,12 @@
+# handlers to restart services
+- name: restart containerd
+  systemd:
+    name: containerd
+    state: restarted
+    enabled: yes
+
+- name: restart kubelet
+  systemd:
+    name: kubelet
+    state: restarted
+    enabled: yes

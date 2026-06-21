@@ -1,0 +1,72 @@
+# roles/kubernetes/tasks/master.yml
+- name: Check if cluster already initialized
+  stat:
+    path: /etc/kubernetes/admin.conf
+  register: kubeadm_conf
+
+- name: Initialize Kubernetes master with kubeadm (if not initialized)
+  command: >
+    kubeadm init --pod-network-cidr={{ k8s_pod_network_cidr }}
+  args:
+    creates: /etc/kubernetes/admin.conf
+  register: kubeadm_init
+  when: not kubeadm_conf.stat.exists
+
+- name: Create .kube dir for ansible_user
+  file:
+    path: "/home/{{ ansible_user }}/.kube"
+    state: directory
+    owner: "{{ ansible_user }}"
+    group: "{{ ansible_user }}"
+    mode: "0755"
+
+- name: Copy admin.conf to user's kube config
+  copy:
+    src: /etc/kubernetes/admin.conf
+    dest: "/home/{{ ansible_user }}/.kube/config"
+    owner: "{{ ansible_user }}"
+    group: "{{ ansible_user }}"
+    mode: "0644"
+    remote_src: true
+
+- name: Wait for kube-apiserver to be ready
+  shell: |
+    export KUBECONFIG=/etc/kubernetes/admin.conf
+    until kubectl get cs >/dev/null 2>&1; do sleep 3; done
+  retries: 20
+  delay: 6
+  register: wait_apiserver
+  failed_when: wait_apiserver.rc != 0 and wait_apiserver.rc is defined
+  changed_when: false
+
+- name: Download Calico manifest
+  get_url:
+    url: "{{ k8s_cni_manifest_url }}"
+    dest: /tmp/calico.yaml
+
+- name: Patch Calico CIDR
+  replace:
+    path: /tmp/calico.yaml
+    regexp: '192.168.0.0/16'
+    replace: '10.244.0.0/16'
+
+
+- name: Install CNI (Calico)
+  shell: |
+    export KUBECONFIG=/etc/kubernetes/admin.conf
+    kubectl apply -f /tmp/calico.yaml
+  register: cni_apply
+  changed_when: cni_apply.rc == 0
+
+- name: Create kubeadm join command and write to file
+  command: kubeadm token create --print-join-command
+  register: join_cmd
+  changed_when: false
+
+- name: Save join command to /tmp/kubeadm_join_cmd.sh
+  copy:
+    dest: /tmp/kubeadm_join_cmd.sh
+    content: |
+      #!/bin/bash
+      {{ join_cmd.stdout }}
+    mode: '0755'

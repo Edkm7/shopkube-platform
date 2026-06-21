@@ -1,0 +1,16 @@
+all:
+  vars:
+    ansible_user: <your_user>
+  children:
+    kube_cluster:
+      children:
+        master:
+          hosts:
+            controlplane-c1:
+              ansible_host: <control_plane_ip>
+        workers:
+          hosts:
+            worker1-c1:
+              ansible_host: <worker1_ip>
+            worker2-c1:
+              ansible_host: <worker2_ip>
