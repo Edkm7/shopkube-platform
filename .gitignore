@@ -1,0 +1,18 @@
+# Secrets — ne jamais commiter
+*.token
+*.key
+*-secret.yaml
+*-credentials.yaml
+vault-keys.txt
+unseal-keys.txt
+*.pem
+*.p12
+
+# Fichiers générés
+*.tar.gz
+/tmp/
+
+# OS
+.DS_Store
+Thumbs.db
+inventory/hosts.yaml
