@@ -1,4 +1,4 @@
-**ShopKube Platform**
+#ShopKube Platform
 
 ShopKube est un projet personnel de plateforme Kubernetes construite sur des machines virtuelles bare-metal. L'objectif est de reproduire un environnement de production réaliste en partant de zéro : provisioning des nœuds, déploiement d'une application microservices, gestion des certificats, packaging et observabilité.
 
@@ -10,27 +10,27 @@ Le cluster est composé de trois nœuds (un control plane et deux workers) provi
 
 **Stack technique**
 
- Cluster = Kubernetes v1.33, kubeadm, Ubuntu 22.04
- Provisioning = Ansible 
- CNI = Calico 
- Runtime = containerd 
- Load Balancer = MetalLB 
- Ingress = Traefik v3
- PKI et TLS =  HashiCorp Vault, cert-manager 
- Stockage = NFS CSI Driver 
- Packaging = Helm v3 
- Observabilite = Prometheus, Grafana, Alertmanager 
- GitOps = ArgoCD + GitLab CI (en cours)
+ Cluster = Kubernetes v1.33, kubeadm, Ubuntu 22.04 \n
+ Provisioning = Ansible\n
+ CNI = Calico \n
+ Runtime = containerd \n 
+ Load Balancer = MetalLB \n 
+ Ingress = Traefik v3 \n
+ PKI et TLS =  HashiCorp Vault, cert-manager \n
+ Stockage = NFS CSI Driver \n
+ Packaging = Helm v3 \n
+ Observabilite = Prometheus, Grafana, Alertmanager \n
+ GitOps = ArgoCD + GitLab CI (en cours) \n
 
-**Structure du repo**
+#Structure du repo**
 
 
-shopkube-platform/
-├── ansible/          # Provisioning automatisé du cluster
-├── infrastructure/   # MetalLB, Traefik, cert-manager, Vault, NFS CSI
-├── helm/shopkube/    # Chart Helm complet des 12 microservices
-├── monitoring/       # kube-prometheus-stack, Ingress Grafana/Prometheus
-└── docs/             # Documentation par module
+shopkube-platform/ \n
+--> ansible/          # Provisioning automatisé du cluster
+--> infrastructure/   # MetalLB, Traefik, cert-manager, Vault, NFS CSI
+--> helm/shopkube/    # Chart Helm complet des 12 microservices
+--> monitoring/       # kube-prometheus-stack, Ingress Grafana/Prometheus
+--> docs/             # Documentation par module
 
 
 **Comment déployer**
@@ -39,37 +39,32 @@ shopkube-platform/
 
 Trois VMs Ubuntu 22.04, Ansible installé sur la machine admin, Helm v3 et un accès SSH aux nœuds.
 
-**Provisionner le cluster**
-
-
+_Provisionner le cluster_
 cd ansible
-# Renseigner les IPs dans hosts.yaml
+_Renseigner les IPs dans hosts.yaml_
 cp inventory/hosts.example.yaml inventory/hosts.yaml
-# Déployer le cluster kube
-ansible-playbook playbooks/cluster.yml 
 
-#Déployer ShopKube en production
+_Déployer le cluster kube_
+ansible-playbook playbooks/cluster.yml
+ 
+_Déployer ShopKube en production_
 helm install shopkube-prod ./helm/shopkube \
   -f helm/shopkube/values-prod.yaml \
   -n shopkube-prod --create-namespace
 
-**Installer le monitoring**
-
+_Installer le monitoring_
 helm install monitoring prometheus-community/kube-prometheus-stack \
   -f monitoring/prometheus-values.yaml \
   -n monitoring --create-namespace
 
 **Points notables**
 
-Le scheduling est configuré pour isoler les workloads critiques (redis, checkout, payment) sur worker1 via des taints et tolerations. Le frontend est contraint sur worker2 via une node affinity. Le loadgenerator ne peut pas se retrouver sur le même nœud que le frontend grâce à une pod anti-affinity.
+_Le scheduling est configuré pour isoler les workloads critiques (redis, checkout, payment) sur worker1 via des taints et tolerations. Le frontend est contraint sur worker2 via une node affinity. Le loadgenerator ne peut pas se retrouver sur le même nœud que le frontend grâce à une pod anti-affinity._
+_La PKI est gérée par Vault comme autorité de certification interne. Les certificats sont émis et renouvelés automatiquement par cert-manager via le Kubernetes auth method, sans token statique à gérer._
+_Le chart Helm supporte plusieurs environnements depuis un seul jeu de templates. Les contraintes de scheduling, le nombre de replicas et le hostname Ingress varient selon le fichier de values chargé._
+_Le monitoring est isolé de la production sur sa propre instance Traefik avec une IP dédiée, accessible via FQDN en HTTPS._
 
-La PKI est gérée par Vault comme autorité de certification interne. Les certificats sont émis et renouvelés automatiquement par cert-manager via le Kubernetes auth method, sans token statique à gérer.
-
-Le chart Helm supporte plusieurs environnements depuis un seul jeu de templates. Les contraintes de scheduling, le nombre de replicas et le hostname Ingress varient selon le fichier de values chargé.
-
-Le monitoring est isolé de la production sur sa propre instance Traefik avec une IP dédiée, accessible via FQDN en HTTPS.
-
-* Roadmap
+**Roadmap**
 
 - [x] Provisioning cluster avec Ansible
 - [x] Stockage persistant NFS CSI
@@ -85,4 +80,4 @@ Le monitoring est isolé de la production sur sa propre instance Traefik avec un
 
 **Auteur**
 
-Eric, disponible sur [GitHub](https://github.com/Edkm7) et https://www.linkedin.com/in/eric-dacier-8a3b2518a/
+_Eric, disponible sur [GitHub](https://github.com/Edkm7) et [Linkedin](https://www.linkedin.com/in/eric-dacier-8a3b2518a/)_
