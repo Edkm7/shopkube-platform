@@ -1,61 +1,51 @@
-#ShopKube Platform
+##ShopKube Platform
 
 ShopKube est un projet personnel de plateforme Kubernetes construite sur des machines virtuelles bare-metal. L'objectif est de reproduire un environnement de production réaliste en partant de zéro : provisioning des nœuds, déploiement d'une application microservices, gestion des certificats, packaging et observabilité.
 
 L'application déployée est [microservices-demo](https://github.com/GoogleCloudPlatform/microservices-demo), un projet open-source de Google Cloud Platform (Online Boutique, 12 microservices). Tous les droits sur le code applicatif appartiennent à Google. Ce repository contient uniquement la plateforme Kubernetes construite autour de cette application.
 
-**Ce que fait ce projet**
+**Ce que fait ce projet:**
 
 Le cluster est composé de trois nœuds (un control plane et deux workers) provisionnés avec Ansible et kubeadm. Une fois le cluster en place, l'application est exposée en HTTPS via Traefik, avec des certificats signés par une CA interne gérée par HashiCorp Vault. Le stockage persistant est assuré par un serveur NFS via le CSI Driver. L'application est packagée en chart Helm avec plusieurs environnements (dev, prod). La stack de monitoring repose sur Prometheus, Grafana et Alertmanager.
 
-**Stack technique**
+**Stack technique:**
 
- Cluster = Kubernetes v1.33, kubeadm, Ubuntu 22.04 \n
- Provisioning = Ansible\n
- CNI = Calico \n
- Runtime = containerd \n 
- Load Balancer = MetalLB \n 
- Ingress = Traefik v3 \n
- PKI et TLS =  HashiCorp Vault, cert-manager \n
- Stockage = NFS CSI Driver \n
- Packaging = Helm v3 \n
- Observabilite = Prometheus, Grafana, Alertmanager \n
- GitOps = ArgoCD + GitLab CI (en cours) \n
+ Cluster = Kubernetes v1.33, kubeadm, Ubuntu 22.04   
+ Provisioning = Ansible  
+ CNI = Calico  
+ Runtime = containerd   
+ Load Balancer = MetalLB   
+ Ingress = Traefik v3  
+ PKI et TLS =  HashiCorp Vault, cert-manager  
+ Stockage = NFS CSI Driver  
+ Packaging = Helm v3  
+ Observabilite = Prometheus, Grafana, Alertmanager  
+ GitOps = ArgoCD + GitLab CI (en cours)  
 
-#Structure du repo**
+##Structure du repo
 
-
-shopkube-platform/ \n
---> ansible/          # Provisioning automatisé du cluster
---> infrastructure/   # MetalLB, Traefik, cert-manager, Vault, NFS CSI
---> helm/shopkube/    # Chart Helm complet des 12 microservices
---> monitoring/       # kube-prometheus-stack, Ingress Grafana/Prometheus
---> docs/             # Documentation par module
-
+shopkube-platform/  
+--> ansible/          # Provisioning automatisé du cluster  
+--> infrastructure/   # MetalLB, Traefik, cert-manager, Vault, NFS CSI  
+--> helm/shopkube/    # Chart Helm complet des 12 microservices  
+--> monitoring/       # kube-prometheus-stack, Ingress Grafana/Prometheus  
+--> docs/             # Documentation par module  
 
 **Comment déployer**
 
 **Prérequis**
-
 Trois VMs Ubuntu 22.04, Ansible installé sur la machine admin, Helm v3 et un accès SSH aux nœuds.
 
-_Provisionner le cluster_
-cd ansible
-_Renseigner les IPs dans hosts.yaml_
-cp inventory/hosts.example.yaml inventory/hosts.yaml
-
-_Déployer le cluster kube_
-ansible-playbook playbooks/cluster.yml
- 
-_Déployer ShopKube en production_
-helm install shopkube-prod ./helm/shopkube \
-  -f helm/shopkube/values-prod.yaml \
-  -n shopkube-prod --create-namespace
-
+_Provisionner le cluster_  
+cd ansible  
+_Renseigner les IPs dans hosts.yaml_  
+cp inventory/hosts.example.yaml inventory/hosts.yaml  
+_Déployer le cluster kube_  
+ansible-playbook playbooks/cluster.yml  
+_Déployer ShopKube en production_  
+helm install shopkube-prod ./helm/shopkube -f helm/shopkube/values-prod.yaml -n shopkube-prod --create-namespace
 _Installer le monitoring_
-helm install monitoring prometheus-community/kube-prometheus-stack \
-  -f monitoring/prometheus-values.yaml \
-  -n monitoring --create-namespace
+helm install monitoring prometheus-community/kube-prometheus-stack -f monitoring/prometheus-values.yaml -n monitoring --create-namespace
 
 **Points notables**
 
