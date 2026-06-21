@@ -2,14 +2,14 @@
 
 Vault est installé sur une VM dédiée hors cluster (192.168.1.121), sur la même machine que GitLab. Il sert d'autorité de certification interne pour signer les certificats TLS des services exposés sur le cluster.
 
-**Installation:**  
+## **Installation:**  
 Vault est installé via le gestionnaire de paquets apt (ne pas utiliser snap, le service systemd ne sera pas créé).
 
 ```wget -O - https://apt.releases.hashicorp.com/gpg | sudo gpg --dearmor -o /usr/share/keyrings/hashicorp-archive-keyring.gpg```  
 ```echo "deb [signed-by=/usr/share/keyrings/hashicorp-archive-keyring.gpg] https://apt.releases.hashicorp.com $(lsb_release -cs) main" | sudo tee /etc/apt/sources.list.d/hashicorp.list```  
 ```sudo apt update && sudo apt install -y vault```
 
-**Configuration:**  
+## **Configuration:**  
 La configuration se trouve dans /etc/vault.d/vault.hcl. Vault utilise le stockage fichier (pas en mémoire) pour persister
 les données entre les redémarrages.
 
@@ -37,9 +37,10 @@ _TLS est désactivé sur Vault lui-même car il tourne sur un réseau interne. E
 #Démarrer Vault  
 ```sudo systemctl enable --now vault```
 
-#Initialisation
+**initialisation**  
 L'initialisation génère 5 clés de déchiffrement (threshold 3) et un root token. Ces éléments ne sont générés qu'une seule 
 fois et ne peuvent pas être récupérés ensuite. Les stocker en lieu sûr.  
+
 **Note:**  
 _En environnement de production, les clés de déchiffrement Vault sont stockées dans un boîtier HSM_
 _(Hardware Security Module) qui effectue les opérations cryptographiques sans jamais exposer les clés en clair_. 
@@ -67,7 +68,6 @@ Après chaque redémarrage de Vault, il faut le déverrouiller avec 3 des 5 clé
 
 **Important :**
 _vérifier la durée de la CA après création. Si le TTL n'a pas été pris en compte, la CA peut avoir une durée par défaut bien inférieure à 10 ans._
-
 ```vault read pki/cert/ca -format=json | jq -r '.data.certificate' | openssl x509 -noout -dates```
 
 **Intégration avec cert-manager (Kubernetes auth method)**
@@ -78,30 +78,30 @@ kubectl apply -f - <<EOF
 apiVersion: v1  
 kind: ServiceAccount  
 metadata:  
-  name: vault-auth  
-  namespace: default  
+    name: vault-auth  
+    namespace: default  
 \---  
 apiVersion: rbac.authorization.k8s.io/v1  
 kind: ClusterRoleBinding  
 metadata:  
-  name: vault-auth-delegator  
-roleRef:  
-  apiGroup: rbac.authorization.k8s.io  
-  kind: ClusterRole  
-  name: system:auth-delegator  
+    name: vault-auth-delegator  
+    roleRef:  
+    apiGroup: rbac.authorization.k8s.io  
+    kind: ClusterRole  
+    name: system:auth-delegator  
 subjects:  
-\- kind: ServiceAccount  
-  name: vault-auth  
-  namespace: default  
+    \- kind: ServiceAccount  
+    name: vault-auth  
+    namespace: default  
 \---  
 apiVersion: v1  
 kind: Secret  
 metadata:   
-  name: vault-auth-token  
-  namespace: default  
-  annotations:  
+    name: vault-auth-token  
+    namespace: default  
+    annotations:  
     kubernetes.io/service-account.name: vault-auth  
-type: kubernetes.io/service-account-token  
+    type: kubernetes.io/service-account-token  
 EOF  
 
 #Récupérer les infos du cluster  
@@ -116,7 +116,7 @@ EOF
 #Créer la policy et le role  
 ```vault policy write cert-manager - <<POLICY```
 ```path "pki/sign/shopkube-local" {```
-  capabilities = ["create", "update"]```
+```capabilities = ["create", "update"]```
 }```
 ```POLICY```
 
