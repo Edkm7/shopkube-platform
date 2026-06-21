@@ -37,10 +37,10 @@ _TLS est désactivé sur Vault lui-même car il tourne sur un réseau interne. E
 #Démarrer Vault  
 ```sudo systemctl enable --now vault```
 
-#Initialisation  
+#Initialisation
 L'initialisation génère 5 clés de déchiffrement (threshold 3) et un root token. Ces éléments ne sont générés qu'une seule 
-fois et ne peuvent pas être récupérés ensuite. Les stocker en lieu sûr.
-**Note:** 
+fois et ne peuvent pas être récupérés ensuite. Les stocker en lieu sûr.  
+**Note:**  
 _En environnement de production, les clés de déchiffrement Vault sont stockées dans un boîtier HSM_
 _(Hardware Security Module) qui effectue les opérations cryptographiques sans jamais exposer les clés en clair_. 
 _Des recovery keys sont générées séparément et conservées hors ligne en cas de perte ou de défaillance du HSM. Dans ce lab, les clés sont stockées manuellement de façon sécurisée à titre d'apprentissage uniquement._
@@ -71,8 +71,7 @@ _vérifier la durée de la CA après création. Si le TTL n'a pas été pris en 
 ```vault read pki/cert/ca -format=json | jq -r '.data.certificate' | openssl x509 -noout -dates```
 
 **Intégration avec cert-manager (Kubernetes auth method)**
-
-Vault valide les ServiceAccounts Kubernetes pour authentifier cert-manager sans token statique.
+Vault valide les ServiceAccounts Kubernetes pour authentifier cert-manager sans token statique.  
 
 #sur le cluster - créer le ServiceAccount et les droits nécessaires  
 kubectl apply -f - <<EOF  
@@ -91,7 +90,7 @@ roleRef:
   kind: ClusterRole  
   name: system:auth-delegator  
 subjects:  
-- kind: ServiceAccount  
+\- kind: ServiceAccount  
   name: vault-auth  
   namespace: default  
 \---  
