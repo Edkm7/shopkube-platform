@@ -1,0 +1,11 @@
+apiVersion: metallb.io/v1beta1
+kind: L2Advertisement
+metadata:
+  annotations: {}
+  generation: 1
+  name: shopkube-l2
+  namespace: metallb-system
+spec:
+  ipAddressPools:
+  - shopkube-pool
+

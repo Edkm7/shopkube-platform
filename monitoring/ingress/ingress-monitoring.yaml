@@ -1,0 +1,78 @@
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  annotations:
+    traefik.ingress.kubernetes.io/router.entrypoints: websecure
+  name: alertmanager-ingress
+  namespace: monitoring
+spec:
+  ingressClassName: traefik-monitoring
+  rules:
+  - host: alertmanager.shopkube.local
+    http:
+      paths:
+      - backend:
+          service:
+            name: monitoring-kube-prometheus-alertmanager
+            port:
+              number: 9093
+        path: /
+        pathType: Prefix
+  tls:
+  - hosts:
+    - alertmanager.shopkube.local
+    secretName: alertmanager-tls-secret
+
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  annotations:
+    traefik.ingress.kubernetes.io/router.entrypoints: websecure
+  name: grafana-ingress
+  namespace: monitoring
+spec:
+  ingressClassName: traefik-monitoring
+  rules:
+  - host: grafana.shopkube.local
+    http:
+      paths:
+      - backend:
+          service:
+            name: monitoring-grafana
+            port:
+              number: 80
+        path: /
+        pathType: Prefix
+  tls:
+  - hosts:
+    - grafana.shopkube.local
+    secretName: grafana-tls-secret
+
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  annotations:
+    traefik.ingress.kubernetes.io/router.entrypoints: websecure
+  name: prometheus-ingress
+  namespace: monitoring
+spec:
+  ingressClassName: traefik-monitoring
+  rules:
+  - host: prometheus.shopkube.local
+    http:
+      paths:
+      - backend:
+          service:
+            name: monitoring-kube-prometheus-prometheus
+            port:
+              number: 9090
+        path: /
+        pathType: Prefix
+  tls:
+  - hosts:
+    - prometheus.shopkube.local
+    secretName: prometheus-tls-secret
+

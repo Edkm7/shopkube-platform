@@ -1,0 +1,5 @@
+providers:
+  kubernetesIngress:
+    ingressClass: traefik-monitoring
+service:
+  type: LoadBalancer
