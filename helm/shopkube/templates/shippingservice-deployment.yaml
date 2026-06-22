@@ -1,0 +1,47 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: shippingservice
+  labels:
+    app: shippingservice
+spec:
+  replicas: {{ .Values.shippingservice.replicas }}
+  selector:
+    matchLabels:
+      app: shippingservice
+  template:
+    metadata:
+      labels:
+        app: shippingservice
+    spec:
+      serviceAccountName: shippingservice
+      securityContext:
+        fsGroup: 1000
+        runAsGroup: 1000
+        runAsNonRoot: true
+        runAsUser: 1000
+      containers:
+      - name: server
+        image: "{{ .Values.global.imageRegistry }}/shippingservice:{{ .Values.shippingservice.imageTag | default .Values.global.imageTag }}"
+        imagePullPolicy: {{ .Values.global.imagePullPolicy }}
+        ports:
+        - containerPort: 50051
+        env:
+        - name: PORT
+          value: "50051"
+        - name: DISABLE_PROFILER
+          value: "1"
+        resources:
+          requests:
+            cpu: {{ .Values.shippingservice.resources.requests.cpu }}
+            memory: {{ .Values.shippingservice.resources.requests.memory }}
+          limits:
+            cpu: {{ .Values.shippingservice.resources.limits.cpu }}
+            memory: {{ .Values.shippingservice.resources.limits.memory }}
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+          privileged: false
+          readOnlyRootFilesystem: true

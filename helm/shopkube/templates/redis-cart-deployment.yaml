@@ -1,0 +1,46 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: redis-cart
+  labels:
+    app: redis-cart
+spec:
+  replicas: {{ index .Values "redis-cart" "replicas" }}
+  selector:
+    matchLabels:
+      app: redis-cart
+  template:
+    metadata:
+      labels:
+        app: redis-cart
+    spec:
+      {{- if index .Values "redis-cart" "priorityClassName" }}
+      priorityClassName: {{ index .Values "redis-cart" "priorityClassName" }}
+      {{- end }}
+      {{- if (index .Values "redis-cart" "tolerations" "enabled") }}
+      tolerations:
+      - key: {{ index .Values "redis-cart" "tolerations" "key" }}
+        operator: {{ index .Values "redis-cart" "tolerations" "operator" }}
+        value: {{ index .Values "redis-cart" "tolerations" "value" }}
+        effect: {{ index .Values "redis-cart" "tolerations" "effect" }}
+      {{- end }}
+      containers:
+      - name: redis
+        image: redis:alpine
+        imagePullPolicy: {{ .Values.global.imagePullPolicy }}
+        ports:
+        - containerPort: 6379
+        volumeMounts:
+        - name: {{ index .Values "redis-cart" "volume" "name" }}
+          mountPath: {{ index .Values "redis-cart" "volume" "mountPath" }}
+        resources:
+          requests:
+            cpu: {{ index .Values "redis-cart" "resources" "requests" "cpu" }}
+            memory: {{ index .Values "redis-cart" "resources" "requests" "memory" }}
+          limits:
+            cpu: {{ index .Values "redis-cart" "resources" "limits" "cpu" }}
+            memory: {{ index .Values "redis-cart" "resources" "limits" "memory" }}
+      volumes:
+      - name: {{ index .Values "redis-cart" "volume" "name" }}
+        persistentVolumeClaim:
+          claimName: {{ index .Values "redis-cart" "volume" "claimName" }}

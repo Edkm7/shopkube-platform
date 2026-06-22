@@ -1,0 +1,57 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: paymentservice
+  labels:
+    app: paymentservice
+spec:
+  replicas: {{ .Values.paymentservice.replicas }}
+  selector:
+    matchLabels:
+      app: paymentservice
+  template:
+    metadata:
+      labels:
+        app: paymentservice
+    spec:
+      {{- if .Values.paymentservice.priorityClassName }}
+      priorityClassName: {{ .Values.paymentservice.priorityClassName }}
+      {{- end }}
+      {{- if .Values.paymentservice.tolerations.enabled }}
+      tolerations:
+      - key: {{ .Values.paymentservice.tolerations.key }}
+        operator: {{ .Values.paymentservice.tolerations.operator }}
+        value: {{ .Values.paymentservice.tolerations.value }}
+        effect: {{ .Values.paymentservice.tolerations.effect }}
+      {{- end }}
+      serviceAccountName: paymentservice
+      securityContext:
+        fsGroup: 1000
+        runAsGroup: 1000
+        runAsNonRoot: true
+        runAsUser: 1000
+      containers:
+      - name: server
+        image: "{{ .Values.global.imageRegistry }}/paymentservice:{{ .Values.paymentservice.imageTag | default .Values.global.imageTag }}"
+        imagePullPolicy: {{ .Values.global.imagePullPolicy }}
+        ports:
+        - containerPort: 50051
+        env:
+        - name: PORT
+          value: "50051"
+        - name: DISABLE_PROFILER
+          value: "1"
+        resources:
+          requests:
+            cpu: {{ .Values.paymentservice.resources.requests.cpu }}
+            memory: {{ .Values.paymentservice.resources.requests.memory }}
+          limits:
+            cpu: {{ .Values.paymentservice.resources.limits.cpu }}
+            memory: {{ .Values.paymentservice.resources.limits.memory }}
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+          privileged: false
+          readOnlyRootFilesystem: true

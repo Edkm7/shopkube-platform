@@ -1,0 +1,49 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: recommendationservice
+  labels:
+    app: recommendationservice
+spec:
+  replicas: {{ .Values.recommendationservice.replicas }}
+  selector:
+    matchLabels:
+      app: recommendationservice
+  template:
+    metadata:
+      labels:
+        app: recommendationservice
+    spec:
+      serviceAccountName: recommendationservice
+      securityContext:
+        fsGroup: 1000
+        runAsGroup: 1000
+        runAsNonRoot: true
+        runAsUser: 1000
+      containers:
+      - name: server
+        image: "{{ .Values.global.imageRegistry }}/recommendationservice:{{ .Values.recommendationservice.imageTag | default .Values.global.imageTag }}"
+        imagePullPolicy: {{ .Values.global.imagePullPolicy }}
+        ports:
+        - containerPort: 8080
+        env:
+        - name: PORT
+          value: "8080"
+        - name: DISABLE_PROFILER
+          value: "1"
+        - name: PRODUCT_CATALOG_SERVICE_ADDR
+          value: "productcatalogservice:3550"
+        resources:
+          requests:
+            cpu: {{ .Values.recommendationservice.resources.requests.cpu }}
+            memory: {{ .Values.recommendationservice.resources.requests.memory }}
+          limits:
+            cpu: {{ .Values.recommendationservice.resources.limits.cpu }}
+            memory: {{ .Values.recommendationservice.resources.limits.memory }}
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+          privileged: false
+          readOnlyRootFilesystem: true

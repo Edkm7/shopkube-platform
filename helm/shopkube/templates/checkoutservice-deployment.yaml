@@ -1,0 +1,67 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: checkoutservice
+  labels:
+    app: checkoutservice
+spec:
+  replicas: {{ .Values.checkoutservice.replicas }}
+  selector:
+    matchLabels:
+      app: checkoutservice
+  template:
+    metadata:
+      labels:
+        app: checkoutservice
+    spec:
+      {{- if .Values.checkoutservice.priorityClassName }}
+      priorityClassName: {{ .Values.checkoutservice.priorityClassName }}
+      {{- end }}
+      {{- if .Values.checkoutservice.tolerations.enabled }}
+      tolerations:
+      - key: {{ .Values.checkoutservice.tolerations.key }}
+        operator: {{ .Values.checkoutservice.tolerations.operator }}
+        value: {{ .Values.checkoutservice.tolerations.value }}
+        effect: {{ .Values.checkoutservice.tolerations.effect }}
+      {{- end }}
+      serviceAccountName: checkoutservice
+      securityContext:
+        fsGroup: 1000
+        runAsGroup: 1000
+        runAsNonRoot: true
+        runAsUser: 1000
+      containers:
+      - name: server
+        image: "{{ .Values.global.imageRegistry }}/checkoutservice:{{ .Values.checkoutservice.imageTag | default .Values.global.imageTag }}"
+        imagePullPolicy: {{ .Values.global.imagePullPolicy }}
+        ports:
+        - containerPort: 5050
+        env:
+        - name: PORT
+          value: "5050"
+        - name: PRODUCT_CATALOG_SERVICE_ADDR
+          value: "productcatalogservice:3550"
+        - name: SHIPPING_SERVICE_ADDR
+          value: "shippingservice:50051"
+        - name: PAYMENT_SERVICE_ADDR
+          value: "paymentservice:50051"
+        - name: EMAIL_SERVICE_ADDR
+          value: "emailservice:5000"
+        - name: CURRENCY_SERVICE_ADDR
+          value: "currencyservice:7000"
+        - name: CART_SERVICE_ADDR
+          value: "cartservice:7070"
+        resources:
+          requests:
+            cpu: {{ .Values.checkoutservice.resources.requests.cpu }}
+            memory: {{ .Values.checkoutservice.resources.requests.memory }}
+          limits:
+            cpu: {{ .Values.checkoutservice.resources.limits.cpu }}
+            memory: {{ .Values.checkoutservice.resources.limits.memory }}
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+          privileged: false
+          readOnlyRootFilesystem: true

@@ -1,0 +1,47 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: adservice
+  labels:
+    app: adservice
+spec:
+  replicas: {{ .Values.adservice.replicas }}
+  selector:
+    matchLabels:
+      app: adservice
+  template:
+    metadata:
+      labels:
+        app: adservice
+    spec:
+      serviceAccountName: adservice
+      securityContext:
+        fsGroup: 1000
+        runAsGroup: 1000
+        runAsNonRoot: true
+        runAsUser: 1000
+      containers:
+      - name: server
+        image: "{{ .Values.global.imageRegistry }}/adservice:{{ .Values.adservice.imageTag | default .Values.global.imageTag }}"
+        imagePullPolicy: {{ .Values.global.imagePullPolicy }}
+        ports:
+        - containerPort: 9555
+        env:
+        - name: PORT
+          value: "9555"
+        - name: DISABLE_PROFILER
+          value: "1"
+        resources:
+          requests:
+            cpu: {{ .Values.adservice.resources.requests.cpu }}
+            memory: {{ .Values.adservice.resources.requests.memory }}
+          limits:
+            cpu: {{ .Values.adservice.resources.limits.cpu }}
+            memory: {{ .Values.adservice.resources.limits.memory }}
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+          privileged: false
+          readOnlyRootFilesystem: true

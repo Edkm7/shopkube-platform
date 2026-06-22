@@ -1,0 +1,47 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: productcatalogservice
+  labels:
+    app: productcatalogservice
+spec:
+  replicas: {{ .Values.productcatalogservice.replicas }}
+  selector:
+    matchLabels:
+      app: productcatalogservice
+  template:
+    metadata:
+      labels:
+        app: productcatalogservice
+    spec:
+      serviceAccountName: productcatalogservice
+      securityContext:
+        fsGroup: 1000
+        runAsGroup: 1000
+        runAsNonRoot: true
+        runAsUser: 1000
+      containers:
+      - name: server
+        image: "{{ .Values.global.imageRegistry }}/productcatalogservice:{{ .Values.productcatalogservice.imageTag | default .Values.global.imageTag }}"
+        imagePullPolicy: {{ .Values.global.imagePullPolicy }}
+        ports:
+        - containerPort: 3550
+        env:
+        - name: PORT
+          value: "3550"
+        - name: DISABLE_PROFILER
+          value: "1"
+        resources:
+          requests:
+            cpu: {{ .Values.productcatalogservice.resources.requests.cpu }}
+            memory: {{ .Values.productcatalogservice.resources.requests.memory }}
+          limits:
+            cpu: {{ .Values.productcatalogservice.resources.limits.cpu }}
+            memory: {{ .Values.productcatalogservice.resources.limits.memory }}
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+          privileged: false
+          readOnlyRootFilesystem: true

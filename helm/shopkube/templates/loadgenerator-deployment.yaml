@@ -1,0 +1,54 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: loadgenerator
+  labels:
+    app: loadgenerator
+spec:
+  replicas: {{ .Values.loadgenerator.replicas }}
+  selector:
+    matchLabels:
+      app: loadgenerator
+  template:
+    metadata:
+      labels:
+        app: loadgenerator
+    spec:
+      {{- if .Values.loadgenerator.podAntiAffinity.enabled }}
+      affinity:
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+          - labelSelector:
+              matchExpressions:
+              - key: app
+                operator: In
+                values:
+                - {{ .Values.loadgenerator.podAntiAffinity.targetApp }}
+            topologyKey: {{ .Values.loadgenerator.podAntiAffinity.topologyKey }}
+      {{- end }}
+      {{- if .Values.loadgenerator.tolerations.enabled }}
+      tolerations:
+      - key: {{ .Values.loadgenerator.tolerations.key }}
+        operator: {{ .Values.loadgenerator.tolerations.operator }}
+        value: {{ .Values.loadgenerator.tolerations.value }}
+        effect: {{ .Values.loadgenerator.tolerations.effect }}
+      {{- end }}
+      restartPolicy: Always
+      containers:
+      - name: main
+        image: "{{ .Values.global.imageRegistry }}/loadgenerator:{{ .Values.loadgenerator.imageTag | default .Values.global.imageTag }}"
+        imagePullPolicy: {{ .Values.global.imagePullPolicy }}
+        env:
+        - name: FRONTEND_ADDR
+          value: "frontend:80"
+        - name: USERS
+          value: "10"
+        - name: RATE
+          value: "1"
+        resources:
+          requests:
+            cpu: {{ .Values.loadgenerator.resources.requests.cpu }}
+            memory: {{ .Values.loadgenerator.resources.requests.memory }}
+          limits:
+            cpu: {{ .Values.loadgenerator.resources.limits.cpu }}
+            memory: {{ .Values.loadgenerator.resources.limits.memory }}

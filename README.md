@@ -122,7 +122,7 @@ kubectl apply -f infrastructure/nfs-csi/
 
 # Traefik
 helm repo add traefik https://traefik.github.io/charts
-helm install traefik traefik/traefik -n traefik --create-namespace
+helm install traefik traefik/traefik -n traefik --create-namespace -f infrastructure/traefik/values-prod.yaml
 
 # cert-manager
 kubectl apply -f https://github.com/cert-manager/cert-manager/releases/download/v1.17.2/cert-manager.yaml

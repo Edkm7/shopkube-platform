@@ -1,0 +1,128 @@
+global:
+  imageRegistry: "us-central1-docker.pkg.dev/google-samples/microservices-demo"
+  imageTag: "v0.10.5"
+  imagePullPolicy: IfNotPresent
+
+ingress:
+  enabled: true
+  host: shopkube.local
+  className: traefik
+  tlsSecret: shopkube-tls-secret
+
+config:
+  DISABLE_PROFILER: "1"
+  PRODUCT_CATALOG_SERVICE_ADDR: "productcatalogservice:3550"
+  REDIS_ADDR: "redis-cart:6379"
+
+frontend:
+  replicas: 3
+  resources:
+    requests: { cpu: 100m, memory: 64Mi }
+    limits: { cpu: 200m, memory: 128Mi }
+  nodeAffinity:
+    enabled: true
+    key: role
+    value: frontend
+
+redis-cart:
+  replicas: 1
+  priorityClassName: shopkube-critical
+  resources:
+    requests: { cpu: 70m, memory: 200Mi }
+    limits: { cpu: 125m, memory: 256Mi }
+  tolerations:
+    enabled: true
+    effect: NoSchedule
+    key: dedicated
+    operator: Equal
+    value: shopkube-critical
+  volume:
+    name: redis-data
+    claimName: redis-pvc-nfs
+    mountPath: /data
+
+checkoutservice:
+  replicas: 3
+  priorityClassName: shopkube-critical
+  resources:
+    requests: { cpu: 100m, memory: 64Mi }
+    limits: { cpu: 200m, memory: 128Mi }
+  tolerations:
+    enabled: true
+    effect: NoSchedule
+    key: dedicated
+    operator: Equal
+    value: shopkube-critical
+
+paymentservice:
+  replicas: 3
+  priorityClassName: shopkube-critical
+  resources:
+    requests: { cpu: 100m, memory: 64Mi }
+    limits: { cpu: 200m, memory: 128Mi }
+  tolerations:
+    enabled: true
+    effect: NoSchedule
+    key: dedicated
+    operator: Equal
+    value: shopkube-critical
+
+loadgenerator:
+  replicas: 1
+  resources:
+    requests: { cpu: 300m, memory: 256Mi }
+    limits: { cpu: 500m, memory: 512Mi }
+  tolerations:
+    enabled: true
+    effect: NoSchedule
+    key: dedicated
+    operator: Equal
+    value: shopkube-critical
+  podAntiAffinity:
+    enabled: true
+    targetApp: frontend
+    topologyKey: kubernetes.io/hostname
+
+cartservice:
+  replicas: 3
+  resources:
+    requests: { cpu: 200m, memory: 64Mi }
+    limits: { cpu: 300m, memory: 128Mi }
+  redisFromConfigMap: true
+
+adservice:
+  replicas: 2
+  resources:
+    requests: { cpu: 200m, memory: 180Mi }
+    limits: { cpu: 300m, memory: 300Mi }
+
+currencyservice:
+  replicas: 2
+  resources:
+    requests: { cpu: 100m, memory: 64Mi }
+    limits: { cpu: 200m, memory: 128Mi }
+
+emailservice:
+  replicas: 2
+  resources:
+    requests: { cpu: 100m, memory: 64Mi }
+    limits: { cpu: 200m, memory: 128Mi }
+  probeInitialDelay: 10
+
+productcatalogservice:
+  replicas: 2
+  resources:
+    requests: { cpu: 100m, memory: 64Mi }
+    limits: { cpu: 200m, memory: 128Mi }
+
+recommendationservice:
+  replicas: 2
+  resources:
+    requests: { cpu: 100m, memory: 220Mi }
+    limits: { cpu: 200m, memory: 450Mi }
+
+shippingservice:
+  replicas: 2
+  resources:
+    requests: { cpu: 100m, memory: 64Mi }
+    limits: { cpu: 200m, memory: 128Mi }

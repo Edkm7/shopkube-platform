@@ -1,0 +1,47 @@
+ingress:
+  enabled: false
+
+frontend:
+  replicas: 1
+  nodeAffinity:
+    enabled: false
+
+redis-cart:
+  replicas: 1
+  priorityClassName: ""
+  tolerations:
+    enabled: false
+
+checkoutservice:
+  replicas: 1
+  priorityClassName: ""
+  tolerations:
+    enabled: false
+
+paymentservice:
+  replicas: 1
+  priorityClassName: ""
+  tolerations:
+    enabled: false
+
+loadgenerator:
+  replicas: 1
+  tolerations:
+    enabled: false
+  podAntiAffinity:
+    enabled: false
+
+cartservice:
+  replicas: 1
+adservice:
+  replicas: 1
+currencyservice:
+  replicas: 1
+emailservice:
+  replicas: 1
+productcatalogservice:
+  replicas: 1
+recommendationservice:
+  replicas: 1
+shippingservice:
+  replicas: 1

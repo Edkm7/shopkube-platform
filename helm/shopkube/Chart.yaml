@@ -1,0 +1,6 @@
+apiVersion: v2
+name: shopkube
+description: ShopKube - Online Boutique microservices platform
+type: application
+version: 1.0.0
+appVersion: "v0.10.5"

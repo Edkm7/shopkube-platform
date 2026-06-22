@@ -1,0 +1,52 @@
+ingress:
+  enabled: true
+  host: shopkube.local
+  className: traefik
+  tlsSecret: shopkube-tls-secret
+
+frontend:
+  replicas: 3
+  nodeAffinity:
+    enabled: true
+    key: role
+    value: frontend
+
+redis-cart:
+  replicas: 1
+  priorityClassName: shopkube-critical
+  tolerations:
+    enabled: true
+
+checkoutservice:
+  replicas: 3
+  priorityClassName: shopkube-critical
+  tolerations:
+    enabled: true
+
+paymentservice:
+  replicas: 3
+  priorityClassName: shopkube-critical
+  tolerations:
+    enabled: true
+
+loadgenerator:
+  replicas: 1
+  tolerations:
+    enabled: true
+  podAntiAffinity:
+    enabled: true
+
+cartservice:
+  replicas: 3
+adservice:
+  replicas: 2
+currencyservice:
+  replicas: 2
+emailservice:
+  replicas: 2
+productcatalogservice:
+  replicas: 2
+recommendationservice:
+  replicas: 2
+shippingservice:
+  replicas: 2

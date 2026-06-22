@@ -1,0 +1,8 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: shopkube-config
+data:
+  DISABLE_PROFILER: "{{ .Values.config.DISABLE_PROFILER }}"
+  PRODUCT_CATALOG_SERVICE_ADDR: "{{ .Values.config.PRODUCT_CATALOG_SERVICE_ADDR }}"
+  REDIS_ADDR: "{{ .Values.config.REDIS_ADDR }}"

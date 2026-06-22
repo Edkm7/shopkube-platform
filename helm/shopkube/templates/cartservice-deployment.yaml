@@ -1,0 +1,53 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cartservice
+  labels:
+    app: cartservice
+spec:
+  replicas: {{ .Values.cartservice.replicas }}
+  selector:
+    matchLabels:
+      app: cartservice
+  template:
+    metadata:
+      labels:
+        app: cartservice
+    spec:
+      serviceAccountName: cartservice
+      securityContext:
+        fsGroup: 1000
+        runAsGroup: 1000
+        runAsNonRoot: true
+        runAsUser: 1000
+      containers:
+      - name: server
+        image: "{{ .Values.global.imageRegistry }}/cartservice:{{ .Values.cartservice.imageTag | default .Values.global.imageTag }}"
+        imagePullPolicy: {{ .Values.global.imagePullPolicy }}
+        ports:
+        - containerPort: 7070
+        env:
+        {{- if .Values.cartservice.redisFromConfigMap }}
+        - name: REDIS_ADDR
+          valueFrom:
+            configMapKeyRef:
+              name: shopkube-config
+              key: REDIS_ADDR
+        {{- else }}
+        - name: REDIS_ADDR
+          value: "redis-cart:6379"
+        {{- end }}
+        resources:
+          requests:
+            cpu: {{ .Values.cartservice.resources.requests.cpu }}
+            memory: {{ .Values.cartservice.resources.requests.memory }}
+          limits:
+            cpu: {{ .Values.cartservice.resources.limits.cpu }}
+            memory: {{ .Values.cartservice.resources.limits.memory }}
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+          privileged: false
+          readOnlyRootFilesystem: true
