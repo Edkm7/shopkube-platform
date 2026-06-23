@@ -1,10 +1,14 @@
 # Monitoring
 
-Ce dossier contient la configuration de la stack d'observabilité basée sur kube-prometheus-stack. Elle déploie Prometheus, Grafana et Alertmanager dans le namespace `monitoring`, avec un accès HTTPS via des FQDN dédiés.
+Ce dossier contient la configuration de la stack d'observabilité basée sur kube-prometheus-stack. Elle déploie Prometheus, Grafana et Alertmanager dans le namespace `monitoring`, sur un nœud dédié isolé des workloads applicatifs.
+
+## Pourquoi un nœud dédié
+
+La stack de monitoring tourne exclusivement sur worker3-c1 (192.168.1.72). Cette décision a été prise suite à un incident révélateur : lors de l'arrêt de worker1-c1 pour tester une alerte `NodeUnreachable`, on a réalisé qu'une panne de worker2-c1 aurait pu emporter Grafana et Prometheus en même temps que les pods ShopKube. L'outil qui surveille ne doit pas dépendre de ce qu'il surveille.
+
+Worker3-c1 est protégé par une taint `dedicated=monitoring:NoSchedule` qui empêche les workloads applicatifs de s'y installer. Tous les composants monitoring ont la toleration correspondante et un nodeSelector `role=monitoring` pour y être forcés.
 
 ## Architecture d'accès
-
-Le monitoring est isolé de la production sur sa propre instance Traefik avec une IP dédiée assignée par MetalLB. Ce choix garantit que si le Traefik de production tombe, l'accès aux outils de monitoring reste disponible.
 
 | Service | URL | IP |
 |---|---|---|
@@ -12,7 +16,16 @@ Le monitoring est isolé de la production sur sa propre instance Traefik avec un
 | Prometheus | https://prometheus.shopkube.local | 192.168.1.202 |
 | Alertmanager | https://alertmanager.shopkube.local | 192.168.1.202 |
 
-Les certificats TLS sont signés par Vault et gérés automatiquement par cert-manager.
+Les certificats TLS sont signés par Vault et gérés automatiquement par cert-manager. L'instance Traefik dédiée au monitoring (192.168.1.202) est isolée du Traefik de production (192.168.1.200).
+
+## Préparer worker3-c1
+
+Depuis admin-vm (192.168.1.100) :
+
+```bash
+kubectl taint node worker3-c1 dedicated=monitoring:NoSchedule
+kubectl label node worker3-c1 role=monitoring
+```
 
 ## Installation
 
@@ -32,7 +45,12 @@ helm install monitoring prometheus-community/kube-prometheus-stack \
 helm install traefik-monitoring traefik/traefik \
   --namespace monitoring \
   --set service.type=LoadBalancer \
-  --set providers.kubernetesIngress.ingressClass=traefik-monitoring
+  --set providers.kubernetesIngress.ingressClass=traefik-monitoring \
+  --set tolerations[0].key=dedicated \
+  --set tolerations[0].operator=Equal \
+  --set tolerations[0].value=monitoring \
+  --set tolerations[0].effect=NoSchedule \
+  --set nodeSelector.role=monitoring
 
 # Appliquer les Ingress
 kubectl apply -f monitoring/ingress/ingress-monitoring.yaml
@@ -95,7 +113,7 @@ EOF
 
 ## Exposer les métriques du control plane
 
-Par défaut, kubeadm configure les composants du control plane pour exposer leurs métriques sur `127.0.0.1` uniquement. Prometheus ne peut pas les atteindre depuis un pod sur un autre nœud. Les modifications suivantes sont nécessaires.
+Par défaut, kubeadm configure les composants du control plane pour exposer leurs métriques sur `127.0.0.1` uniquement. Prometheus ne peut pas les atteindre depuis un pod sur un autre nœud.
 
 Sur controlplane-c1 (192.168.1.69) :
 
@@ -123,9 +141,34 @@ kubectl edit configmap kube-proxy -n kube-system
 kubectl rollout restart daemonset kube-proxy -n kube-system
 ```
 
+## Configuration Alertmanager
+
+Alertmanager est configuré pour envoyer les notifications vers Slack. La configuration contient le webhook Slack et est stockée dans un Secret Kubernetes (non versionné).
+
+```bash
+kubectl create secret generic alertmanager-monitoring-kube-prometheus-alertmanager \
+  --from-literal=alertmanager.yaml='
+global:
+  slack_api_url: "<WEBHOOK_URL>"
+route:
+  receiver: slack-alertes
+  group_by: [alertname, severity]
+  group_wait: 30s
+  group_interval: 5m
+  repeat_interval: 4h
+receivers:
+- name: slack-alertes
+  slack_configs:
+  - channel: "#alertes"
+    title: "{{ .GroupLabels.alertname }}"
+    text: "{{ range .Alerts }}{{ .Annotations.description }}\n{{ end }}"
+    send_resolved: true
+' -n monitoring --dry-run=client -o yaml | kubectl apply -f -
+```
+
 ## Ajouter les FQDN sur les clients
 
-Sur chaque machine qui doit accéder aux interfaces de monitoring, ajouter cette ligne dans le fichier hosts :
+Sur chaque machine qui doit accéder aux interfaces de monitoring, ajouter cette ligne dans le fichier hosts.
 
 Linux (`/etc/hosts`) et Windows (`C:\Windows\System32\drivers\etc\hosts`) :
 

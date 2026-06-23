@@ -6,15 +6,18 @@ L'application déployée est [microservices-demo](https://github.com/GoogleCloud
 
 ## Infrastructure
 
-Le projet s'appuie sur 5 machines virtuelles :
+Le projet s'appuie sur 6 machines virtuelles :
 
 | VM | IP | Rôle |
 |---|---|---|
 | admin-vm | 192.168.1.100 | Machine d'administration (kubectl, Helm, Ansible) + serveur NFS |
 | controlplane-c1 | 192.168.1.69 | Control plane Kubernetes |
-| worker1-c1 | 192.168.1.70 | Worker — workloads critiques (taint dédié) |
+| worker1-c1 | 192.168.1.70 | Worker — workloads critiques (taint dedicated=shopkube-critical) |
 | worker2-c1 | 192.168.1.71 | Worker — frontend et workloads standards |
+| worker3-c1 | 192.168.1.72 | Worker — monitoring dédié (taint dedicated=monitoring) |
 | vault-git | 192.168.1.121 | HashiCorp Vault (CA PKI) + GitLab CI |
+
+Worker3-c1 a été ajouté pour isoler la stack de monitoring (Prometheus, Grafana, Alertmanager, Traefik monitoring) des workloads applicatifs. Cette séparation garantit que si un worker applicatif tombe, les outils de monitoring restent disponibles pour diagnostiquer le problème. Sans cette isolation, une panne de worker2-c1 aurait pu emporter Grafana et Prometheus en même temps que les pods ShopKube.
 
 ## Architecture
 
@@ -45,6 +48,10 @@ graph TB
 
         subgraph worker2-c1 - 192.168.1.71
             W2[frontend / adservice\nWorkloads standards]
+        end
+
+        subgraph worker3-c1 - 192.168.1.72
+            W3[Prometheus / Grafana\nAlertmanager / Traefik monitoring]
         end
 
         subgraph Namespaces
@@ -99,7 +106,7 @@ Toutes les commandes ci-dessous s'exécutent depuis **admin-vm (192.168.1.100)**
 
 ### Prérequis
 
-Trois VMs Ubuntu 22.04 (1 control plane, 2 workers), Ansible installé sur la machine admin, Helm v3 et un accès SSH aux nœuds.
+Six VMs Ubuntu 22.04, Ansible installé sur admin-vm, Helm v3 et un accès SSH aux nœuds.
 
 ### 1. Provisionner le cluster
 
@@ -108,6 +115,16 @@ cd ansible
 cp inventory/hosts.example.yaml inventory/hosts.yaml
 # Renseigner les IPs dans hosts.yaml
 ansible-playbook playbooks/cluster.yml
+```
+
+Pour ajouter un nœud worker après l'initialisation du cluster, générer d'abord le script de join sur le control plane puis lancer le playbook en ciblant uniquement le nouveau nœud :
+
+```bash
+# Sur controlplane-c1
+sudo sh -c 'echo "#!/bin/bash" > /tmp/kubeadm_join_cmd.sh && kubeadm token create --print-join-command >> /tmp/kubeadm_join_cmd.sh && chmod +x /tmp/kubeadm_join_cmd.sh'
+
+# Depuis admin-vm
+ansible-playbook playbooks/cluster.yml --limit worker3-c1
 ```
 
 ### 2. Installer l'infrastructure
@@ -120,9 +137,10 @@ kubectl apply -f infrastructure/metallb/
 curl -skSL https://raw.githubusercontent.com/kubernetes-csi/csi-driver-nfs/master/deploy/install-driver.sh | bash -s master --
 kubectl apply -f infrastructure/nfs-csi/
 
-# Traefik
+# Traefik prod
 helm repo add traefik https://traefik.github.io/charts
-helm install traefik traefik/traefik -n traefik --create-namespace -f infrastructure/traefik/values-prod.yaml
+helm install traefik traefik/traefik -n traefik --create-namespace \
+  -f infrastructure/traefik/values-prod.yaml
 
 # cert-manager
 kubectl apply -f https://github.com/cert-manager/cert-manager/releases/download/v1.17.2/cert-manager.yaml
@@ -142,11 +160,29 @@ helm install shopkube-prod ./helm/shopkube \
 ### 4. Installer le monitoring
 
 ```bash
+# Préparer worker3-c1 pour le monitoring
+kubectl taint node worker3-c1 dedicated=monitoring:NoSchedule
+kubectl label node worker3-c1 role=monitoring
+
 helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
 
 helm install monitoring prometheus-community/kube-prometheus-stack \
   -f monitoring/prometheus-values.yaml \
   -n monitoring --create-namespace
+
+# Traefik dédié au monitoring
+helm install traefik-monitoring traefik/traefik \
+  --namespace monitoring \
+  --set service.type=LoadBalancer \
+  --set providers.kubernetesIngress.ingressClass=traefik-monitoring \
+  --set tolerations[0].key=dedicated \
+  --set tolerations[0].operator=Equal \
+  --set tolerations[0].value=monitoring \
+  --set tolerations[0].effect=NoSchedule \
+  --set nodeSelector.role=monitoring
+
+# Ingress et certificats monitoring
+kubectl apply -f monitoring/ingress/
 ```
 
 ## Points notables
@@ -157,7 +193,7 @@ La PKI est gérée par Vault comme autorité de certification interne. Les certi
 
 Le chart Helm supporte plusieurs environnements depuis un seul jeu de templates. Les contraintes de scheduling, le nombre de replicas et le hostname Ingress varient selon le fichier de values chargé.
 
-Le monitoring est isolé de la production sur sa propre instance Traefik avec une IP dédiée, accessible via FQDN en HTTPS.
+Le monitoring est isolé sur worker3-c1 avec sa propre instance Traefik (192.168.1.202), séparé des workloads applicatifs sur worker1 et worker2.
 
 ## Roadmap
 
@@ -166,7 +202,7 @@ Le monitoring est isolé de la production sur sa propre instance Traefik avec un
 - [x] Scheduling avancé (Taints, Affinity, PriorityClass)
 - [x] Ingress TLS avec Vault PKI et cert-manager
 - [x] Chart Helm multi-environnement
-- [x] Observabilite Prometheus, Grafana, Alertmanager
+- [x] Observabilite Prometheus, Grafana, Alertmanager sur nœud dédié
 - [ ] Alerting (PrometheusRule)
 - [ ] GitOps ArgoCD avec GitLab CI
 - [ ] Autoscaling HPA et VPA

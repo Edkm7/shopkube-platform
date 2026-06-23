@@ -28,3 +28,58 @@ alertmanager:
       limits:
         cpu: 100m
         memory: 128Mi
+
+# Forcer tous les composants sur worker3-c1
+prometheus:
+  prometheusSpec:
+    tolerations:
+    - key: dedicated
+      operator: Equal
+      value: monitoring
+      effect: NoSchedule
+    nodeSelector:
+      role: monitoring
+
+alertmanager:
+  alertmanagerSpec:
+    tolerations:
+    - key: dedicated
+      operator: Equal
+      value: monitoring
+      effect: NoSchedule
+    nodeSelector:
+      role: monitoring
+
+grafana:
+  tolerations:
+  - key: dedicated
+    operator: Equal
+    value: monitoring
+    effect: NoSchedule
+  nodeSelector:
+    role: monitoring
+
+prometheusOperator:
+  tolerations:
+  - key: dedicated
+    operator: Equal
+    value: monitoring
+    effect: NoSchedule
+  nodeSelector:
+    role: monitoring
+
+kube-state-metrics:
+  tolerations:
+  - key: dedicated
+    operator: Equal
+    value: monitoring
+    effect: NoSchedule
+  nodeSelector:
+    role: monitoring
+
+prometheus-node-exporter:
+  tolerations:
+  - key: dedicated
+    operator: Equal
+    value: monitoring
+    effect: NoSchedule
