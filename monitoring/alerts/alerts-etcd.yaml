@@ -1,0 +1,43 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: shopkube-etcd-alerts
+  namespace: monitoring
+  labels:
+    release: monitoring
+spec:
+  groups:
+  - name: etcd
+    rules:
+
+    - alert: EtcdLeaderLost
+      expr: etcd_server_has_leader == 0
+      for: 1m
+      labels:
+        severity: critical
+      annotations:
+        summary: "etcd n'a plus de leader sur {{ $labels.instance }}"
+        description: "Le membre etcd {{ $labels.instance }} n'a plus de leader depuis plus d'1 minute. Le cluster Kubernetes est en lecture seule — aucune modification d'état n'est possible jusqu'à l'élection d'un nouveau leader."
+
+    - alert: EtcdHighLatency
+      expr: |
+        histogram_quantile(
+          0.99,
+          rate(etcd_disk_wal_fsync_duration_seconds_bucket[5m])
+        ) > 0.5
+      for: 5m
+      labels:
+        severity: warning
+      annotations:
+        summary: "Latence WAL élevée sur etcd {{ $labels.instance }}"
+        description: "Le 99ème percentile de latence d'écriture WAL sur {{ $labels.instance }} dépasse 500ms depuis 5 minutes. Latence actuelle : {{ $value | humanizeDuration }}. Vérifier les performances disque du nœud control plane."
+
+    - alert: EtcdInsufficientMembers
+      expr: |
+        count(etcd_server_has_leader) < 2
+      for: 1m
+      labels:
+        severity: critical
+      annotations:
+        summary: "Nombre de membres etcd insuffisant"
+        description: "Le cluster etcd n'a plus assez de membres pour maintenir le quorum. Membres actifs : {{ $value }}. Le cluster Kubernetes ne peut plus accepter d'écritures."

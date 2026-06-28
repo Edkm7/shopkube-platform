@@ -1,0 +1,27 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: shopkube-monitoring-alerts
+  namespace: monitoring
+  labels:
+    release: monitoring
+spec:
+  groups:
+  - name: monitoring
+    rules:
+
+    - alert: PrometheusTargetDown
+      expr: up == 0
+      for: 2m
+      labels:
+        severity: warning
+      annotations:
+        summary: "Cible Prometheus {{ $labels.job }} indisponible"
+        description: "Prometheus ne peut plus scraper la cible {{ $labels.instance }} (job={{ $labels.job }}) depuis plus de 2 minutes. Vérifier que le service est en cours d'exécution et que le port metrics est accessible."
+
+    # Le Watchdog est une alerte toujours active générée par kube-prometheus-stack.
+    # Elle garantit que le pipeline Prometheus → Alertmanager → Slack fonctionne.
+    # En production, un système externe (PagerDuty Dead Man's Snitch) reçoit ce signal
+    # et alerte l'équipe si le Watchdog s'arrête de sonner — signe qu'Alertmanager est mort.
+    # Cette alerte est déjà présente via kube-prometheus-stack, aucune règle supplémentaire
+    # n'est nécessaire.

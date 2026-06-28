@@ -1,0 +1,53 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: shopkube-workloads-alerts
+  namespace: monitoring
+  labels:
+    release: monitoring
+spec:
+  groups:
+  - name: workloads
+    rules:
+
+    - alert: PodCrashLoopBackOff
+      expr: kube_pod_container_status_waiting_reason{reason="CrashLoopBackOff"} == 1
+      for: 2m
+      labels:
+        severity: critical
+      annotations:
+        summary: "Pod {{ $labels.pod }} en CrashLoopBackOff"
+        description: "Le conteneur {{ $labels.container }} du pod {{ $labels.pod }} dans le namespace {{ $labels.namespace }} est en CrashLoopBackOff depuis plus de 2 minutes."
+
+    - alert: PodFailedOrPendingTooLong
+      expr: |
+        (
+          kube_pod_status_phase{phase="Failed"} == 1
+          or
+          kube_pod_status_phase{phase="Pending"} == 1
+        )
+      for: 5m
+      labels:
+        severity: warning
+      annotations:
+        summary: "Pod {{ $labels.pod }} en état {{ $labels.phase }} depuis plus de 5 minutes"
+        description: "Le pod {{ $labels.pod }} dans le namespace {{ $labels.namespace }} est en état {{ $labels.phase }} depuis plus de 5 minutes. Vérifier les événements avec kubectl describe pod."
+
+    - alert: PodOOMKilled
+      expr: kube_pod_container_status_last_terminated_reason{reason="OOMKilled"} == 1
+      for: 0m
+      labels:
+        severity: critical
+      annotations:
+        summary: "Pod {{ $labels.pod }} tué par OOM"
+        description: "Le conteneur {{ $labels.container }} du pod {{ $labels.pod }} dans le namespace {{ $labels.namespace }} a été tué par le kernel (Out Of Memory). Augmenter les memory limits ou investiguer une fuite mémoire."
+
+    - alert: DeploymentReplicasUnavailable
+      expr: |
+        kube_deployment_status_replicas_unavailable > 0
+      for: 5m
+      labels:
+        severity: warning
+      annotations:
+        summary: "Deployment {{ $labels.deployment }} a des replicas indisponibles"
+        description: "Le deployment {{ $labels.deployment }} dans le namespace {{ $labels.namespace }} a {{ $value }} replica(s) indisponible(s) depuis plus de 5 minutes."

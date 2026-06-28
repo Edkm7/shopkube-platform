@@ -1,0 +1,24 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: shopkube-storage-alerts
+  namespace: monitoring
+  labels:
+    release: monitoring
+spec:
+  groups:
+  - name: storage
+    rules:
+
+    - alert: PersistentVolumeFillingUp
+      expr: |
+        (
+          kubelet_volume_stats_used_bytes /
+          kubelet_volume_stats_capacity_bytes
+        ) > 0.85
+      for: 2m
+      labels:
+        severity: warning
+      annotations:
+        summary: "PersistentVolume {{ $labels.persistentvolumeclaim }} presque plein"
+        description: "Le PersistentVolume associé au PVC {{ $labels.persistentvolumeclaim }} dans le namespace {{ $labels.namespace }} est utilisé à {{ $value | humanizePercentage }}. Libérer de l'espace ou augmenter la capacité."

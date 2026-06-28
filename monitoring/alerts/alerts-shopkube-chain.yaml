@@ -1,0 +1,77 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: shopkube-chain-alerts
+  namespace: monitoring
+  labels:
+    release: monitoring
+spec:
+  groups:
+  - name: shopkube-chain
+    rules:
+
+    - alert: VaultSealed
+      expr: vault_core_unsealed == 0
+      for: 1m
+      labels:
+        severity: critical
+      annotations:
+        summary: "Vault est scellé"
+        description: "Vault (192.168.1.121) est en état sealed depuis plus d'1 minute. Les nouveaux certificats ne peuvent plus être émis et les renouvellements automatiques vont échouer."
+
+    - alert: CSIDriverDown
+      expr: kube_pod_status_ready{namespace="kube-system", pod=~"csi-nfs.*"} == 0
+      for: 2m
+      labels:
+        severity: critical
+      annotations:
+        summary: "Pod NFS CSI Driver {{ $labels.pod }} indisponible"
+        description: "Le pod {{ $labels.pod }} du NFS CSI Driver est indisponible depuis plus de 2 minutes. Le provisionnement dynamique des PersistentVolumes NFS est interrompu."
+
+    - alert: CertificateExpiringSoon
+      expr: |
+        certmanager_certificate_expiration_timestamp_seconds - time() < 7 * 24 * 3600
+      for: 1h
+      labels:
+        severity: warning
+      annotations:
+        summary: "Certificat {{ $labels.name }} expire dans moins de 7 jours"
+        description: "Le certificat {{ $labels.name }} dans le namespace {{ $labels.namespace }} expire dans moins de 7 jours. Vérifier que cert-manager peut contacter Vault pour le renouvellement."
+
+    - alert: CertificateExpired
+      expr: |
+        certmanager_certificate_expiration_timestamp_seconds - time() < 0
+      for: 0m
+      labels:
+        severity: critical
+      annotations:
+        summary: "Certificat {{ $labels.name }} expiré"
+        description: "Le certificat {{ $labels.name }} dans le namespace {{ $labels.namespace }} est expiré. Les connexions HTTPS vers ce service sont interrompues."
+
+    - alert: ContainerMemoryHigh
+      expr: |
+        (
+          container_memory_working_set_bytes{container!=""}
+          /
+          kube_pod_container_resource_limits{resource="memory", container!=""}
+        ) > 0.90
+      for: 5m
+      labels:
+        severity: warning
+      annotations:
+        summary: "Mémoire élevée sur {{ $labels.container }}"
+        description: "Le conteneur {{ $labels.container }} du pod {{ $labels.pod }} dans le namespace {{ $labels.namespace }} utilise plus de 90% de sa memory limit depuis 5 minutes. Risque d'OOMKill imminent."
+
+    - alert: ContainerCPUHigh
+      expr: |
+        (
+          rate(container_cpu_usage_seconds_total{container!=""}[5m])
+          /
+          kube_pod_container_resource_limits{resource="cpu", container!=""}
+        ) > 0.90
+      for: 5m
+      labels:
+        severity: warning
+      annotations:
+        summary: "CPU élevé sur {{ $labels.container }}"
+        description: "Le conteneur {{ $labels.container }} du pod {{ $labels.pod }} dans le namespace {{ $labels.namespace }} utilise plus de 90% de sa CPU limit depuis 5 minutes. Risque de throttling."

@@ -1,0 +1,47 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: shopkube-traefik-alerts
+  namespace: monitoring
+  labels:
+    release: monitoring
+spec:
+  groups:
+  - name: traefik
+    rules:
+
+    - alert: Traefik5xxHigh
+      expr: |
+        (
+          rate(traefik_service_requests_total{code=~"5.."}[5m])
+          /
+          rate(traefik_service_requests_total[5m])
+        ) > 0.05
+      for: 2m
+      labels:
+        severity: critical
+      annotations:
+        summary: "Taux d'erreurs 5xx élevé sur {{ $labels.service }}"
+        description: "Le service {{ $labels.service }} retourne plus de 5% d'erreurs 5xx depuis 2 minutes. Taux actuel : {{ $value | humanizePercentage }}. Vérifier l'état des pods en aval."
+
+    - alert: TraefikBackendDown
+      expr: traefik_service_server_up == 0
+      for: 0m
+      labels:
+        severity: critical
+      annotations:
+        summary: "Backend Traefik {{ $labels.service }} indisponible"
+        description: "Traefik ne peut plus joindre le backend {{ $labels.service }} ({{ $labels.url }}). Le trafic vers ce service est interrompu."
+
+    - alert: TraefikLatencyHigh
+      expr: |
+        histogram_quantile(
+          0.99,
+          rate(traefik_service_request_duration_seconds_bucket[5m])
+        ) > 1
+      for: 5m
+      labels:
+        severity: warning
+      annotations:
+        summary: "Latence P99 élevée sur {{ $labels.service }}"
+        description: "Le 99ème percentile de latence sur le service {{ $labels.service }} dépasse 1 seconde depuis 5 minutes. Latence actuelle : {{ $value | humanizeDuration }}. Vérifier la charge des pods en aval."
