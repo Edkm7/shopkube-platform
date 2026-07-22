@@ -1,6 +1,6 @@
 # ShopKube Platform
 
-ShopKube est un projet personnel de plateforme Kubernetes construite sur des machines virtuelles bare-metal. L'objectif est de reproduire un environnement de production réaliste en partant de zéro : provisioning des nœuds, déploiement d'une application microservices, gestion des certificats, packaging et observabilité.
+ShopKube est un projet personnel de plateforme Kubernetes construite sur des machines virtuelles bare-metal. L'objectif est de reproduire un environnement de production réaliste en partant de zéro : provisioning des nœuds, déploiement d'une application microservices, gestion des certificats, packaging, observabilité et GitOps.
 
 L'application déployée est [microservices-demo](https://github.com/GoogleCloudPlatform/microservices-demo), un projet open-source de Google Cloud Platform (Online Boutique, 12 microservices). Tous les droits sur le code applicatif appartiennent à Google. Ce repository contient uniquement la plateforme Kubernetes construite autour de cette application.
 
@@ -15,7 +15,7 @@ Le projet s'appuie sur 6 machines virtuelles :
 | worker1-c1 | 192.168.1.70 | Worker — workloads critiques (taint dedicated=shopkube-critical) |
 | worker2-c1 | 192.168.1.71 | Worker — frontend et workloads standards |
 | worker3-c1 | 192.168.1.72 | Worker — monitoring dédié (taint dedicated=monitoring) |
-| vault-git | 192.168.1.121 | HashiCorp Vault (CA PKI) + GitLab CI |
+| vault-git | 192.168.1.121 | HashiCorp Vault (CA PKI) · GitLab CE · GitLab Runner · GitLab Registry · Apache HTTPD (reverse proxy) · HAProxy (frontal TLS) |
 
 Worker3-c1 a été ajouté pour isoler la stack de monitoring (Prometheus, Grafana, Alertmanager, Traefik monitoring) des workloads applicatifs. Cette séparation garantit que si un worker applicatif tombe, les outils de monitoring restent disponibles pour diagnostiquer le problème. Sans cette isolation, une panne de worker2-c1 aurait pu emporter Grafana et Prometheus en même temps que les pods ShopKube.
 
@@ -27,9 +27,11 @@ graph TB
         B[Navigateur]
     end
 
-    subgraph VMs externes
-        V[Vault PKI + GitLab CI\n192.168.1.121]
-        N[Serveur NFS\n192.168.1.100]
+    subgraph vault-git - 192.168.1.121
+        HAP[HAProxy - TLS termination]
+        APA[Apache HTTPD - reverse proxy]
+        GL[GitLab CE + Registry]
+        VA[Vault PKI]
     end
 
     subgraph Cluster Kubernetes - kubeadm
@@ -39,34 +41,35 @@ graph TB
         end
 
         subgraph controlplane-c1 - 192.168.1.69
-            CP[kube-apiserver\netcd\nscheduler\ncontroller-manager]
+            CP[kube-apiserver · etcd\nscheduler · controller-manager]
         end
 
         subgraph worker1-c1 - 192.168.1.70
-            W1[checkout / payment / redis\nWorkloads critiques]
+            W1[checkout · payment · redis\nWorkloads critiques]
         end
 
         subgraph worker2-c1 - 192.168.1.71
-            W2[frontend / adservice\nWorkloads standards]
+            W2[frontend · adservice\nWorkloads standards]
         end
 
         subgraph worker3-c1 - 192.168.1.72
-            W3[Prometheus / Grafana\nAlertmanager / Traefik monitoring]
+            W3[Prometheus · Grafana\nAlertmanager · Traefik monitoring]
         end
 
-        subgraph Namespaces
-            NS1[shopkube-prod]
-            NS2[monitoring\nPrometheus · Grafana · Alertmanager]
-        end
+        ARGO[ArgoCD\nnamespace argocd]
     end
 
-    B -->|shopkube.local HTTPS| T1
-    B -->|grafana.shopkube.local HTTPS| T2
-    T1 --> NS1
-    T2 --> NS2
-    V -->|certificats TLS| NS1
-    V -->|certificats TLS| NS2
-    N -->|PVC NFS| W1
+    B -->|HTTPS| HAP
+    HAP -->|shopkube.local| T1
+    HAP -->|argocd.shopkube.local| T1
+    HAP -->|vault.shopkube.local| APA
+    HAP -->|gitlab.shopkube.local| APA
+    HAP -->|grafana.shopkube.local| T2
+    APA --> VA
+    APA --> GL
+    GL -->|GitOps| ARGO
+    ARGO -->|déploie| W1
+    ARGO -->|déploie| W2
 ```
 
 ## Stack technique
@@ -83,7 +86,10 @@ graph TB
 | Stockage | NFS CSI Driver |
 | Packaging | Helm v3 |
 | Observabilite | Prometheus, Grafana, Alertmanager |
-| GitOps | ArgoCD + GitLab CI (en cours) |
+| Alerting | PrometheusRule (23 règles), Slack |
+| CI/CD | GitLab CE, GitLab Runner, GitLab Registry |
+| GitOps | ArgoCD |
+| Frontal réseau | HAProxy (TLS termination), Apache HTTPD (reverse proxy) |
 | Application | [microservices-demo](https://github.com/GoogleCloudPlatform/microservices-demo) (Google Cloud Platform) |
 
 ## Structure du repo
@@ -96,8 +102,10 @@ graph TB
 | `infrastructure/cert-manager/` | ClusterIssuer pointant vers Vault |
 | `infrastructure/vault/` | Configuration PKI et guide d'installation (VM hors cluster) |
 | `infrastructure/nfs-csi/` | StorageClass dynamique |
+| `infrastructure/argocd/` | Ingress ArgoCD |
 | `helm/shopkube/` | Chart Helm complet des 12 microservices avec values prod et dev |
 | `monitoring/` | kube-prometheus-stack, Ingress Grafana, Prometheus et Alertmanager |
+| `monitoring/alerts/` | PrometheusRules (nodes, workloads, storage, chain, traefik, monitoring) |
 | `docs/` | Documentation par module |
 
 ## Comment déployer
@@ -117,7 +125,7 @@ cp inventory/hosts.example.yaml inventory/hosts.yaml
 ansible-playbook playbooks/cluster.yml
 ```
 
-Pour ajouter un nœud worker après l'initialisation du cluster, générer d'abord le script de join sur le control plane puis lancer le playbook en ciblant uniquement le nouveau nœud :
+Pour ajouter un nœud worker après l'initialisation du cluster :
 
 ```bash
 # Sur controlplane-c1
@@ -160,12 +168,11 @@ helm install shopkube-prod ./helm/shopkube \
 ### 4. Installer le monitoring
 
 ```bash
-# Préparer worker3-c1 pour le monitoring
+# Préparer worker3-c1
 kubectl taint node worker3-c1 dedicated=monitoring:NoSchedule
 kubectl label node worker3-c1 role=monitoring
 
 helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
-
 helm install monitoring prometheus-community/kube-prometheus-stack \
   -f monitoring/prometheus-values.yaml \
   -n monitoring --create-namespace
@@ -181,8 +188,17 @@ helm install traefik-monitoring traefik/traefik \
   --set tolerations[0].effect=NoSchedule \
   --set nodeSelector.role=monitoring
 
-# Ingress et certificats monitoring
+# Appliquer les Ingress et les alerting rules
 kubectl apply -f monitoring/ingress/
+kubectl apply -f monitoring/alerts/
+```
+
+### 5. Installer ArgoCD
+
+```bash
+kubectl create namespace argocd
+kubectl apply -n argocd -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
+kubectl apply -f infrastructure/argocd/
 ```
 
 ## Points notables
@@ -193,7 +209,11 @@ La PKI est gérée par Vault comme autorité de certification interne. Les certi
 
 Le chart Helm supporte plusieurs environnements depuis un seul jeu de templates. Les contraintes de scheduling, le nombre de replicas et le hostname Ingress varient selon le fichier de values chargé.
 
-Le monitoring est isolé sur worker3-c1 avec sa propre instance Traefik (192.168.1.202), séparé des workloads applicatifs sur worker1 et worker2.
+Le monitoring est isolé sur worker3-c1 avec sa propre instance Traefik (192.168.1.202), séparé des workloads applicatifs sur worker1 et worker2. 23 règles d'alerting PrometheusRule envoient les notifications vers Slack.
+
+Le pipeline GitOps est opérationnel : GitLab CI build et scanne les images avec Trivy, les pousse dans le GitLab Registry, met à jour le tag dans le repo GitOps, et ArgoCD déploie automatiquement avec self-heal.
+
+HAProxy sur vault-git est le point d'entrée TLS unique pour tous les services — ShopKube, Vault, GitLab, ArgoCD et Grafana sont tous accessibles via HTTPS sur leur propre FQDN.
 
 ## Roadmap
 
@@ -203,12 +223,13 @@ Le monitoring est isolé sur worker3-c1 avec sa propre instance Traefik (192.168
 - [x] Ingress TLS avec Vault PKI et cert-manager
 - [x] Chart Helm multi-environnement
 - [x] Observabilite Prometheus, Grafana, Alertmanager sur nœud dédié
-- [ ] Alerting (PrometheusRule)
-- [ ] GitOps ArgoCD avec GitLab CI
+- [x] Alerting PrometheusRule (23 règles) avec notifications Slack
+- [x] GitOps ArgoCD avec GitLab CI et scan Trivy
+- [x] Frontal réseau HAProxy + Apache HTTPD
+- [ ] Tomcat + JBoss dans legacy-apps
 - [ ] Autoscaling HPA et VPA
 - [ ] Network Policies et RBAC
 - [ ] Logs avec Loki
 
 ## Auteur
-
 _Eric, disponible sur [GitHub](https://github.com/Edkm7) et [Linkedin](https://www.linkedin.com/in/eric-dacier-8a3b2518a/)_
