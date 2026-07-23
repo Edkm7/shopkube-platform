@@ -226,7 +226,7 @@ HAProxy sur vault-git est le point d'entrée TLS unique pour tous les services �
 - [x] Alerting PrometheusRule (23 règles) avec notifications Slack
 - [x] GitOps ArgoCD avec GitLab CI et scan Trivy
 - [x] Frontal réseau HAProxy + Apache HTTPD
-- [ ] Tomcat + JBoss dans legacy-apps
+- [x] Tomcat + JBoss dans legacy-apps (JPetStore + Kitchensink via GitOps)
 - [ ] Autoscaling HPA et VPA
 - [ ] Network Policies et RBAC
 - [ ] Logs avec Loki
