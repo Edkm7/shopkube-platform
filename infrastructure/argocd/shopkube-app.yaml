@@ -1,0 +1,21 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: shopkube-prod
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: git@192.168.1.121:eric/shopkube-gitops.git
+    targetRevision: main
+    path: helm/shopkube
+    helm:
+      valueFiles:
+      - values-prod.yaml
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: shopkube-prod
+  syncPolicy:
+    automated:
+      prune: false
+      selfHeal: true
